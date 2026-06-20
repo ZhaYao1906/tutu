@@ -14,6 +14,7 @@ interface GameState {
   setFilterType: (type: 'all' | 'scenic' | 'food' | 'culture' | 'personal') => void;
   visitSpot: (spotId: string) => void;
   updateQuestStatus: (questId: string, status: 'available' | 'inProgress' | 'completed') => void;
+  addQuest: (quest: Quest) => void;
   addXp: (amount: number) => void;
 }
 
@@ -72,6 +73,10 @@ export const useGameStore = create<GameState>((set) => ({
       }
     };
   }),
+  
+  addQuest: (quest) => set((state) => ({
+    quests: [...state.quests, quest]
+  })),
   
   addXp: (amount) => set((state) => ({
     user: {

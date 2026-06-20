@@ -2,7 +2,11 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { useGameStore } from '../store/gameStore';
 
-const Hero: React.FC = () => {
+interface HeroProps {
+  onEnter: () => void;
+}
+
+const Hero: React.FC<HeroProps> = ({ onEnter }) => {
   const user = useGameStore(state => state.user);
 
   const cities = [
@@ -13,7 +17,7 @@ const Hero: React.FC = () => {
   ];
 
   return (
-    <section className="relative min-h-screen star-bg flex flex-col items-center justify-center px-4">
+    <section className="relative h-full star-bg flex flex-col items-center justify-center px-4">
       <motion.div
         initial={{ opacity: 0, y: -50 }}
         animate={{ opacity: 1, y: 0 }}
@@ -91,21 +95,15 @@ const Hero: React.FC = () => {
         ))}
       </motion.div>
 
-      <motion.div
+      <motion.button
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 1.5, duration: 0.8 }}
-        className="absolute bottom-8 z-10"
+        onClick={onEnter}
+        className="btn-primary z-10"
       >
-        <motion.div
-          animate={{ y: [0, 10, 0] }}
-          transition={{ duration: 1.5, repeat: Infinity }}
-          className="text-gray-400 text-center"
-        >
-          <p className="mb-2">向下滚动开始探索</p>
-          <div className="text-2xl">↓</div>
-        </motion.div>
-      </motion.div>
+        开始探索
+      </motion.button>
     </section>
   );
 };

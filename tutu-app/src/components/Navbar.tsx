@@ -1,51 +1,21 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { motion } from 'framer-motion';
 import { useGameStore } from '../store/gameStore';
 
-const Navbar: React.FC = () => {
-  const [isScrolled, setIsScrolled] = useState(false);
-  const [activeSection, setActiveSection] = useState('hero');
+interface NavbarProps {
+  activeTab: string;
+  onTabChange: (tabId: string) => void;
+}
+
+const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange }) => {
   const user = useGameStore(state => state.user);
 
   const navItems = [
-    { id: 'explore', label: '城市探索' },
-    { id: 'quests', label: '任务中心' },
-    { id: 'level', label: '等级成长' },
-    { id: 'achievements', label: '成就系统' },
-    { id: 'profile', label: '个人中心' },
-    { id: 'forum', label: '城市论坛' },
-    { id: 'leaderboard', label: '排行榜' },
+    { id: 'explore', label: '城市探索', icon: '🗺️' },
+    { id: 'quests', label: '任务中心', icon: '📋' },
+    { id: 'forum', label: '城市论坛', icon: '💬' },
+    { id: 'profile', label: '个人中心', icon: '👤' },
   ];
-
-  useEffect(() => {
-    const handleScroll = () => {
-      setIsScrolled(window.scrollY > 50);
-      
-      const sections = navItems.map(item => document.getElementById(item.id));
-      const scrollPosition = window.scrollY + 100;
-
-      sections.forEach((section, index) => {
-        if (section) {
-          const offsetTop = section.offsetTop;
-          const offsetHeight = section.offsetHeight;
-          
-          if (scrollPosition >= offsetTop && scrollPosition < offsetTop + offsetHeight) {
-            setActiveSection(navItems[index].id);
-          }
-        }
-      });
-    };
-
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
-
-  const scrollToSection = (id: string) => {
-    const element = document.getElementById(id);
-    if (element) {
-      element.scrollIntoView({ behavior: 'smooth' });
-    }
-  };
 
   const xpProgress = (user.xp / 1000) * 100;
 
@@ -53,9 +23,7 @@ const Navbar: React.FC = () => {
     <motion.nav
       initial={{ y: -100 }}
       animate={{ y: 0 }}
-      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
-        isScrolled ? 'bg-gray-900/95 backdrop-blur-md shadow-lg' : 'bg-transparent'
-      }`}
+      className="bg-gray-900/95 backdrop-blur-md shadow-lg border-b border-gray-700"
     >
       <div className="max-w-7xl mx-auto px-4">
         <div className="flex items-center justify-between h-16">
@@ -64,19 +32,22 @@ const Navbar: React.FC = () => {
             <span className="font-game text-xl font-bold text-tutu-gold">拓图</span>
           </div>
 
-          <div className="hidden md:flex items-center gap-6">
+          <div className="flex items-center gap-6">
             {navItems.map((item) => (
-              <button
+              <motion.button
                 key={item.id}
-                onClick={() => scrollToSection(item.id)}
-                className={`text-sm font-medium transition-all ${
-                  activeSection === item.id
-                    ? 'text-tutu-gold'
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => onTabChange(item.id)}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all ${
+                  activeTab === item.id
+                    ? 'bg-gradient-to-r from-tutu-gold to-tutu-orange text-gray-900 glow-gold'
                     : 'text-gray-300 hover:text-tutu-gold'
                 }`}
               >
-                {item.label}
-              </button>
+                <span className="text-xl">{item.icon}</span>
+                <span className="hidden md:inline">{item.label}</span>
+              </motion.button>
             ))}
           </div>
 

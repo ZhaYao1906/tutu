@@ -24,6 +24,7 @@ export interface Quest {
   difficulty: 'easy' | 'medium' | 'hard';
   category: 'work' | 'fitness' | 'study' | 'life';
   status: 'available' | 'inProgress' | 'completed';
+  date?: string;
 }
 
 export interface Achievement {
