@@ -1,17 +1,17 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useGameStore } from '../store/gameStore';
-import { mockAccountItems, mockSkills } from '../data/mockData';
+import { mockSkills } from '../data/mockData';
 import LevelGrowth from './LevelGrowth';
 import AchievementSystem from './AchievementSystem';
 import Leaderboard from './Leaderboard';
+import AccountSystem from './AccountSystem';
 
 type ProfileTab = 'home' | 'level' | 'achievements' | 'leaderboard' | 'account' | 'settings';
 
 const PersonalCenter: React.FC = () => {
   const user = useGameStore(state => state.user);
   const [activeTab, setActiveTab] = useState<ProfileTab>('home');
-  const [accountType, setAccountType] = useState<'expense' | 'income'>('expense');
 
   const tabs = [
     { id: 'home', label: '我的家园', icon: '🏠' },
@@ -190,70 +190,8 @@ const PersonalCenter: React.FC = () => {
                   initial={{ opacity: 0, x: 20 }}
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: -20 }}
-                  className="card-game"
                 >
-                  <h3 className="text-2xl font-bold text-white mb-6">记账本</h3>
-                  <div className="flex gap-4 mb-6">
-                    <button
-                      onClick={() => setAccountType('expense')}
-                      className={`px-4 py-2 rounded-lg font-medium ${
-                        accountType === 'expense'
-                          ? 'bg-tutu-red text-white'
-                          : 'bg-gray-800 text-gray-300'
-                      }`}
-                    >
-                      支出
-                    </button>
-                    <button
-                      onClick={() => setAccountType('income')}
-                      className={`px-4 py-2 rounded-lg font-medium ${
-                        accountType === 'income'
-                          ? 'bg-tutu-emerald text-white'
-                          : 'bg-gray-800 text-gray-300'
-                      }`}
-                    >
-                      收入
-                    </button>
-                  </div>
-
-                  <div className="bg-gray-800 rounded-lg p-4 mb-6">
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-                      <input
-                        type="number"
-                        placeholder="金额"
-                        className="bg-gray-700 rounded-lg px-4 py-2 text-white"
-                      />
-                      <select className="bg-gray-700 rounded-lg px-4 py-2 text-white">
-                        <option>餐饮</option>
-                        <option>交通</option>
-                        <option>购物</option>
-                        <option>娱乐</option>
-                      </select>
-                      <input
-                        type="text"
-                        placeholder="备注"
-                        className="bg-gray-700 rounded-lg px-4 py-2 text-white"
-                      />
-                      <button className="btn-primary">添加</button>
-                    </div>
-                  </div>
-
-                  <div className="space-y-3">
-                    {mockAccountItems.filter(item => item.type === accountType).map((item) => (
-                      <div key={item.id} className="bg-gray-800 rounded-lg p-4 flex justify-between items-center">
-                        <div>
-                          <div className="text-white font-semibold">{item.category}</div>
-                          <div className="text-sm text-gray-400">{item.note}</div>
-                          <div className="text-xs text-gray-500">{item.time}</div>
-                        </div>
-                        <div className={`text-xl font-bold ${
-                          item.type === 'expense' ? 'text-tutu-red' : 'text-tutu-emerald'
-                        }`}>
-                          {item.type === 'expense' ? '-' : '+'}{item.amount}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+                  <AccountSystem />
                 </motion.div>
               )}
 
