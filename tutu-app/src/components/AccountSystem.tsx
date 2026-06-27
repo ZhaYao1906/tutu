@@ -1,5 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
+import { accountApi } from '../services/api';
+import { useGameStore } from '../store/gameStore';
 
 interface AccountItem {
   id: string;
@@ -20,19 +22,35 @@ const AccountSystem: React.FC = () => {
     note: ''
   });
 
-  // Mock数据
-  const [accountItems, setAccountItems] = useState<AccountItem[]>([
-    { id: '1', type: 'expense', amount: 35, category: '餐饮', note: '午餐', time: '2024-06-15 12:30' },
-    { id: '2', type: 'expense', amount: 200, category: '交通', note: '地铁充值', time: '2024-06-15 18:00' },
-    { id: '3', type: 'income', amount: 15000, category: '工资', note: '6月工资', time: '2024-06-10 09:00' },
-    { id: '4', type: 'expense', amount: 500, category: '购物', note: '购买日用品', time: '2024-06-14 15:20' },
-    { id: '5', type: 'expense', amount: 80, category: '娱乐', note: '看电影', time: '2024-06-13 20:00' },
-    { id: '6', type: 'expense', amount: 120, category: '餐饮', note: '晚餐', time: '2024-06-12 19:30' },
-    { id: '7', type: 'expense', amount: 50, category: '交通', note: '打车', time: '2024-06-11 08:00' },
-    { id: '8', type: 'income', amount: 500, category: '兼职', note: '周末兼职', time: '2024-06-09 18:00' },
-    { id: '9', type: 'expense', amount: 300, category: '购物', note: '买衣服', time: '2024-06-08 14:00' },
-    { id: '10', type: 'expense', amount: 40, category: '餐饮', note: '早餐', time: '2024-06-07 07:30' },
-  ]);
+  const [accountItems, setAccountItems] = useState<AccountItem[]>([]);
+
+  const isAuthenticated = useGameStore(state => state.isAuthenticated);
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      loadAccounts();
+    }
+  }, [isAuthenticated, currentDate]);
+
+  const loadAccounts = async () => {
+    try {
+      const data = await accountApi.getAll();
+      if (data && Array.isArray(data)) {
+        // 将后端数据转换为前端格式
+        const items: AccountItem[] = data.map((item: any) => ({
+          id: String(item.id),
+          type: item.type,
+          amount: item.amount,
+          category: item.category,
+          note: item.note || '',
+          time: item.time || item.createdAt || '',
+        }));
+        setAccountItems(items);
+      }
+    } catch (error) {
+      console.error('加载记账数据失败:', error);
+    }
+  };
 
   const monthNames = ['一月', '二月', '三月', '四月', '五月', '六月', '七月', '八月', '九月', '十月', '十一月', '十二月'];
 
@@ -67,21 +85,63 @@ const AccountSystem: React.FC = () => {
       return acc;
     }, {} as Record<string, number>);
 
-  const handleAddAccount = () => {
+  const handleAddAccount = async () => {
     if (!newAccount.amount || parseFloat(newAccount.amount) <= 0) return;
 
-    const account: AccountItem = {
-      id: `account-${Date.now()}`,
-      type: accountType,
-      amount: parseFloat(newAccount.amount),
-      category: newAccount.category,
-      note: newAccount.note || `${newAccount.category}`,
-      time: `${monthStr}-${String(new Date().getDate()).padStart(2, '0')} ${new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}`
-    };
+    try {
+      const now = new Date();
+      const timeStr = `${monthStr}-${String(now.getDate()).padStart(2, '0')} ${now.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}`;
 
-    setAccountItems([...accountItems, account]);
-    setShowAddModal(false);
-    setNewAccount({ amount: '', category: '餐饮', note: '' });
+      // 如果已登录，保存到后端
+      if (isAuthenticated) {
+        const saved = await accountApi.create({
+          type: accountType,
+          amount: parseFloat(newAccount.amount),
+          category: newAccount.category,
+          note: newAccount.note || newAccount.category,
+          time: timeStr,
+        });
+        // 用后端返回的数据更新
+        if (saved) {
+          const newItem: AccountItem = {
+            id: String((saved as any).id || Date.now()),
+            type: accountType,
+            amount: parseFloat(newAccount.amount),
+            category: newAccount.category,
+            note: newAccount.note || newAccount.category,
+            time: timeStr,
+          };
+          setAccountItems([...accountItems, newItem]);
+        }
+      } else {
+        // 未登录时只在本地添加
+        const account: AccountItem = {
+          id: `account-${Date.now()}`,
+          type: accountType,
+          amount: parseFloat(newAccount.amount),
+          category: newAccount.category,
+          note: newAccount.note || newAccount.category,
+          time: timeStr,
+        };
+        setAccountItems([...accountItems, account]);
+      }
+
+      setShowAddModal(false);
+      setNewAccount({ amount: '', category: '餐饮', note: '' });
+    } catch (error) {
+      console.error('添加记账失败:', error);
+    }
+  };
+
+  const handleDeleteAccount = async (id: string) => {
+    try {
+      if (isAuthenticated) {
+        await accountApi.delete(parseInt(id));
+      }
+      setAccountItems(accountItems.filter(item => item.id !== id));
+    } catch (error) {
+      console.error('删除记账失败:', error);
+    }
   };
 
   const expenseCategories = ['餐饮', '交通', '购物', '娱乐', '房租', '水电', '通讯', '医疗', '教育', '其他'];
@@ -217,6 +277,14 @@ const AccountSystem: React.FC = () => {
               }`}>
                 {item.type === 'expense' ? '-' : '+'}¥{item.amount.toFixed(2)}
               </div>
+              <motion.button
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.9 }}
+                onClick={() => handleDeleteAccount(item.id)}
+                className="text-gray-500 hover:text-tutu-red text-sm ml-2"
+              >
+                🗑️
+              </motion.button>
             </motion.div>
           ))}
       </div>

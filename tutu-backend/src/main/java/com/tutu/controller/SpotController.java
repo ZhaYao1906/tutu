@@ -39,9 +39,10 @@ public class SpotController {
     }
 
     @PostMapping("/{id}/visit")
-    public ResponseEntity<ApiResponse<Map<String, Object>>> visitSpot(@PathVariable Long id) {
+    public ResponseEntity<ApiResponse<Map<String, Object>>> visitSpot(@PathVariable Long id, @RequestBody(required = false) Map<String, Object> body) {
         Long userId = currentUser.getUserId();
-        Map<String, Object> result = spotService.visitSpot(userId, id);
+        String visitTimeStr = body != null ? (String) body.get("visitTime") : null;
+        Map<String, Object> result = spotService.visitSpot(userId, id, visitTimeStr);
         return ResponseEntity.ok(ApiResponse.success("打卡成功", result));
     }
 }

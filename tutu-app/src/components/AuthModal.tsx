@@ -18,6 +18,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onAuthSuccess })
   const [mode, setMode] = useState<Mode>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [username, setUsername] = useState('');
   const [avatar, setAvatar] = useState<string>(AVATAR_OPTIONS[0]);
   const [error, setError] = useState<string>('');
@@ -26,6 +27,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onAuthSuccess })
   const resetForm = () => {
     setEmail('');
     setPassword('');
+    setConfirmPassword('');
     setUsername('');
     setAvatar(AVATAR_OPTIONS[0]);
     setError('');
@@ -52,6 +54,9 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onAuthSuccess })
     }
     if (password.length < 6) {
       return '密码长度至少 6 位';
+    }
+    if (mode === 'register' && password !== confirmPassword) {
+      return '两次输入的密码不一致';
     }
     return null;
   };
@@ -161,6 +166,27 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onAuthSuccess })
                   autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
                 />
               </div>
+
+              <AnimatePresence mode="wait">
+                {mode === 'register' && (
+                  <motion.div
+                    key="confirm-password"
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                  >
+                    <label className="block text-sm text-gray-400 mb-1">确认密码</label>
+                    <input
+                      type="password"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      placeholder="请再次输入密码"
+                      className={inputClass}
+                      autoComplete="new-password"
+                    />
+                  </motion.div>
+                )}
+              </AnimatePresence>
 
               <AnimatePresence mode="wait">
                 {mode === 'register' && (

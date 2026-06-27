@@ -66,9 +66,13 @@ public class SpotService {
         }).toList();
     }
 
-    public Map<String, Object> visitSpot(Long userId, Long spotId) {
+    public Map<String, Object> visitSpot(Long userId, Long spotId, String visitTimeStr) {
         Spot spot = getSpotById(spotId);
         Optional<UserSpot> existing = userSpotRepository.findByUserIdAndSpotId(userId, spotId);
+
+        LocalDateTime visitTime = visitTimeStr != null
+            ? LocalDateTime.parse(visitTimeStr.replace("T", "T").replace("Z", ""))
+            : LocalDateTime.now();
 
         boolean newVisit = false;
         if (existing.isEmpty()) {
@@ -76,12 +80,12 @@ public class SpotService {
             userSpot.setUser(userService.getUserById(userId));
             userSpot.setSpot(spot);
             userSpot.setVisited(true);
-            userSpot.setVisitedAt(LocalDateTime.now());
+            userSpot.setVisitedAt(visitTime);
             userSpotRepository.save(userSpot);
             newVisit = true;
         } else if (!existing.get().getVisited()) {
             existing.get().setVisited(true);
-            existing.get().setVisitedAt(LocalDateTime.now());
+            existing.get().setVisitedAt(visitTime);
             userSpotRepository.save(existing.get());
             newVisit = true;
         }

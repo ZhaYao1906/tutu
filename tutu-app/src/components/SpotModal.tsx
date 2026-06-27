@@ -1,27 +1,33 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import type { Spot } from '../types';
 
 interface SpotModalProps {
   spot: Spot;
   onClose: () => void;
-  onVisit: (e: React.MouseEvent) => void;
+  onVisit: (e: React.MouseEvent, visitTime?: string) => void;
 }
 
 const SpotModal: React.FC<SpotModalProps> = ({ spot, onClose, onVisit }) => {
+  const [visitTime, setVisitTime] = useState(() => {
+    const now = new Date();
+    const offset = now.getTimezoneOffset() * 60000;
+    return new Date(now.getTime() - offset).toISOString().slice(0, 16);
+  });
+
   return (
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4"
+      className="fixed inset-0 bg-black/70 flex items-center justify-center z-[9999] p-4"
       onClick={onClose}
     >
       <motion.div
         initial={{ scale: 0.8, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         exit={{ scale: 0.8, opacity: 0 }}
-        className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-xl p-6 max-w-md w-full border border-gray-700 shadow-2xl"
+        className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-xl p-6 max-w-md w-full border border-gray-700 shadow-2xl relative"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex justify-between items-start mb-4">
@@ -59,7 +65,7 @@ const SpotModal: React.FC<SpotModalProps> = ({ spot, onClose, onVisit }) => {
           </div>
         </div>
 
-        <div className="flex gap-2 mb-4">
+        <div className="flex gap-2 mb-4 flex-wrap">
           {spot.tags.map((tag) => (
             <span
               key={tag}
@@ -76,14 +82,25 @@ const SpotModal: React.FC<SpotModalProps> = ({ spot, onClose, onVisit }) => {
               <span className="text-tutu-emerald">✓ 已打卡</span>
             </div>
           ) : (
-            <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={onVisit}
-              className="flex-1 btn-primary"
-            >
-              打卡获得 {spot.xp} XP
-            </motion.button>
+            <div className="w-full">
+              <div className="mb-3">
+                <label className="block text-sm text-gray-400 mb-1">打卡时间</label>
+                <input
+                  type="datetime-local"
+                  value={visitTime}
+                  onChange={(e) => setVisitTime(e.target.value)}
+                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white text-sm focus:outline-none focus:border-tutu-gold"
+                />
+              </div>
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={(e) => onVisit(e, visitTime)}
+                className="w-full btn-primary"
+              >
+                打卡获得 {spot.xp} XP
+              </motion.button>
+            </div>
           )}
         </div>
       </motion.div>

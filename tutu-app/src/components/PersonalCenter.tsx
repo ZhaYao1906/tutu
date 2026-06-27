@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useGameStore } from '../store/gameStore';
-import { userApi } from '../services/api';
+import { userApi, accountApi } from '../services/api';
 import { mockSkills } from '../data/mockData';
 import LevelGrowth from './LevelGrowth';
 import AchievementSystem from './AchievementSystem';
@@ -19,6 +19,22 @@ const PersonalCenter: React.FC = () => {
   const [editName, setEditName] = useState('');
   const [editLocation, setEditLocation] = useState('');
   const [settingsName, setSettingsName] = useState(user.name);
+  const [monthBalance, setMonthBalance] = useState<number>(0);
+
+  // 加载当月经济数据
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    const now = new Date();
+    const monthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    accountApi.getStats(monthStr).then((stats: unknown) => {
+      const s = stats as { income?: number; expense?: number; balance?: number };
+      if (s && typeof s.balance === 'number') {
+        setMonthBalance(s.balance);
+      } else if (s && typeof s.income === 'number' && typeof s.expense === 'number') {
+        setMonthBalance(s.income - s.expense);
+      }
+    }).catch(() => {});
+  }, [isAuthenticated, activeTab]);
 
   const handleSaveLocation = async () => {
     if (!editingType) return;
@@ -81,10 +97,10 @@ const PersonalCenter: React.FC = () => {
                 <p className="text-sm text-gray-400">Lv.{user.level} {user.title}</p>
               </div>
 
-              <div className="grid grid-cols-3 gap-4 mb-6">
+              <div className="grid grid-cols-2 gap-4 mb-6">
                 <div className="text-center">
                   <div className="text-lg font-bold text-tutu-gold">{user.xp}</div>
-                  <div className="text-xs text-gray-400">XP</div>
+                  <div className="text-xs text-gray-400">经验值</div>
                 </div>
                 <div className="text-center">
                   <div className="text-lg font-bold text-tutu-emerald">{user.questsCompleted}</div>
@@ -93,6 +109,12 @@ const PersonalCenter: React.FC = () => {
                 <div className="text-center">
                   <div className="text-lg font-bold text-tutu-purple">{user.achievementsUnlocked}</div>
                   <div className="text-xs text-gray-400">成就</div>
+                </div>
+                <div className="text-center cursor-pointer" onClick={() => setActiveTab('account')}>
+                  <div className={`text-lg font-bold ${monthBalance >= 0 ? 'text-tutu-cyan' : 'text-tutu-red'}`}>
+                    {monthBalance >= 0 ? '+' : ''}¥{monthBalance.toFixed(0)}
+                  </div>
+                  <div className="text-xs text-gray-400">经济</div>
                 </div>
               </div>
 

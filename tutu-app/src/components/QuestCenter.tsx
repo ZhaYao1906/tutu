@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useGameStore } from '../store/gameStore';
 import { useXpPopup } from '../hooks/useXpPopup';
+import { dailyRecordApi } from '../services/api';
 import type { Quest } from '../types';
 import XpPopupDisplay from './XpPopupDisplay';
 
@@ -27,6 +28,8 @@ const QuestCenter: React.FC = () => {
   const [dailyDiary, setDailyDiary] = useState('');
   const [dailyWeather, setDailyWeather] = useState('');
   const [savingRecord, setSavingRecord] = useState(false);
+  const [recordMode, setRecordMode] = useState<'view' | 'edit'>('edit');
+  const [currentRecordId, setCurrentRecordId] = useState<number | undefined>(undefined);
 
   const formatDate = (date: Date): string => {
     return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
@@ -41,11 +44,15 @@ const QuestCenter: React.FC = () => {
         setDailyScore(existing.moodScore || 3);
         setDailyDiary(existing.diary || '');
         setDailyWeather(existing.weather || '');
+        setCurrentRecordId(existing.id);
+        setRecordMode('view');  // 有记录时进入查看模式
       } else {
         setDailyMood('😊');
         setDailyScore(3);
         setDailyDiary('');
         setDailyWeather('');
+        setCurrentRecordId(undefined);
+        setRecordMode('edit');  // 无记录时进入编辑模式
       }
     }
   }, [selectedDate, dailyRecords]);
@@ -61,10 +68,31 @@ const QuestCenter: React.FC = () => {
         diary: dailyDiary,
         weather: dailyWeather,
       });
+      setRecordMode('view');
     } catch (error) {
       console.error('保存每日记录失败:', error);
     } finally {
       setSavingRecord(false);
+    }
+  };
+
+  const handleDeleteRecord = async () => {
+    if (!currentRecordId) return;
+    try {
+      await dailyRecordApi.delete(currentRecordId);
+      // 从store中移除该记录
+      useGameStore.setState(state => ({
+        dailyRecords: state.dailyRecords.filter(r => r.id !== currentRecordId)
+      }));
+      // 重置表单
+      setDailyMood('😊');
+      setDailyScore(3);
+      setDailyDiary('');
+      setDailyWeather('');
+      setCurrentRecordId(undefined);
+      setRecordMode('edit');
+    } catch (error) {
+      console.error('删除每日记录失败:', error);
     }
   };
 
@@ -360,62 +388,109 @@ const QuestCenter: React.FC = () => {
                 <div className="border-t border-gray-700 mt-4 pt-4">
                   <h4 className="text-lg font-bold text-white mb-3">📝 每日记录</h4>
 
-                  {/* 心情选择 */}
-                  <div className="mb-3">
-                    <label className="text-gray-400 text-sm mb-2 block">今日心情</label>
-                    <div className="flex gap-2">
-                      {['😄', '😊', '😐', '😔', '😢'].map((emoji, i) => (
+                  {recordMode === 'view' ? (
+                    <>
+                      {/* 心情与评分（只读） */}
+                      <div className="mb-3">
+                        <label className="text-gray-400 text-sm mb-2 block">今日心情</label>
+                        <div className="flex items-center gap-3 bg-gray-800 rounded-lg px-4 py-3">
+                          <span className="text-3xl">{dailyMood}</span>
+                          <span className="text-gray-300 text-sm">心情评分：{dailyScore} / 5</span>
+                        </div>
+                      </div>
+
+                      {/* 天气（只读） */}
+                      <div className="mb-3">
+                        <label className="text-gray-400 text-sm mb-2 block">天气</label>
+                        <div className="flex items-center gap-3 bg-gray-800 rounded-lg px-4 py-3">
+                          <span className="text-2xl">{dailyWeather || '—'}</span>
+                        </div>
+                      </div>
+
+                      {/* 日记内容（只读） */}
+                      <div className="mb-3">
+                        <label className="text-gray-400 text-sm mb-2 block">今日日记</label>
+                        <div className="bg-gray-800 rounded-lg px-4 py-2 text-white text-sm whitespace-pre-wrap min-h-[3rem]">
+                          {dailyDiary || '（暂无日记内容）'}
+                        </div>
+                      </div>
+
+                      {/* 编辑与删除按钮 */}
+                      <div className="flex gap-3">
                         <button
-                          key={emoji}
-                          onClick={() => { setDailyMood(emoji); setDailyScore(5 - i); }}
-                          className={`w-10 h-10 rounded-lg flex items-center justify-center text-xl transition ${
-                            dailyMood === emoji ? 'bg-tutu-gold/20 border-2 border-tutu-gold' : 'bg-gray-700 border border-gray-600'
-                          }`}
+                          onClick={() => setRecordMode('edit')}
+                          className="flex-1 btn-primary"
                         >
-                          {emoji}
+                          编辑
                         </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* 天气 */}
-                  <div className="mb-3">
-                    <label className="text-gray-400 text-sm mb-1 block">天气</label>
-                    <div className="flex gap-2">
-                      {['☀️', '⛅', '☁️', '🌧️', '❄️'].map((w) => (
                         <button
-                          key={w}
-                          onClick={() => setDailyWeather(w)}
-                          className={`w-9 h-9 rounded-lg flex items-center justify-center transition ${
-                            dailyWeather === w ? 'bg-tutu-blue/20 border border-tutu-blue' : 'bg-gray-700 border border-gray-600'
-                          }`}
+                          onClick={handleDeleteRecord}
+                          className="flex-1 py-2 rounded-lg bg-tutu-red/20 text-tutu-red border border-tutu-red/40 hover:bg-tutu-red/30 transition font-semibold"
                         >
-                          {w}
+                          删除
                         </button>
-                      ))}
-                    </div>
-                  </div>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      {/* 心情选择 */}
+                      <div className="mb-3">
+                        <label className="text-gray-400 text-sm mb-2 block">今日心情</label>
+                        <div className="flex gap-2">
+                          {['😄', '😊', '😐', '😔', '😢'].map((emoji, i) => (
+                            <button
+                              key={emoji}
+                              onClick={() => { setDailyMood(emoji); setDailyScore(5 - i); }}
+                              className={`w-10 h-10 rounded-lg flex items-center justify-center text-xl transition ${
+                                dailyMood === emoji ? 'bg-tutu-gold/20 border-2 border-tutu-gold' : 'bg-gray-700 border border-gray-600'
+                              }`}
+                            >
+                              {emoji}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
 
-                  {/* 日记 */}
-                  <div className="mb-3">
-                    <label className="text-gray-400 text-sm mb-1 block">今日日记</label>
-                    <textarea
-                      value={dailyDiary}
-                      onChange={(e) => setDailyDiary(e.target.value)}
-                      placeholder="记录今天的故事..."
-                      className="w-full bg-gray-700 rounded-lg px-4 py-2 text-white text-sm"
-                      rows={3}
-                    />
-                  </div>
+                      {/* 天气 */}
+                      <div className="mb-3">
+                        <label className="text-gray-400 text-sm mb-1 block">天气</label>
+                        <div className="flex gap-2">
+                          {['☀️', '⛅', '☁️', '🌧️', '❄️'].map((w) => (
+                            <button
+                              key={w}
+                              onClick={() => setDailyWeather(w)}
+                              className={`w-9 h-9 rounded-lg flex items-center justify-center transition ${
+                                dailyWeather === w ? 'bg-tutu-blue/20 border border-tutu-blue' : 'bg-gray-700 border border-gray-600'
+                              }`}
+                            >
+                              {w}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
 
-                  {/* 保存按钮 */}
-                  <button
-                    onClick={handleSaveDailyRecord}
-                    disabled={savingRecord}
-                    className="w-full btn-primary disabled:opacity-50"
-                  >
-                    {savingRecord ? '保存中...' : '保存记录'}
-                  </button>
+                      {/* 日记 */}
+                      <div className="mb-3">
+                        <label className="text-gray-400 text-sm mb-1 block">今日日记</label>
+                        <textarea
+                          value={dailyDiary}
+                          onChange={(e) => setDailyDiary(e.target.value)}
+                          placeholder="记录今天的故事..."
+                          className="w-full bg-gray-700 rounded-lg px-4 py-2 text-white text-sm"
+                          rows={3}
+                        />
+                      </div>
+
+                      {/* 保存按钮 */}
+                      <button
+                        onClick={handleSaveDailyRecord}
+                        disabled={savingRecord}
+                        className="w-full btn-primary disabled:opacity-50"
+                      >
+                        {savingRecord ? '保存中...' : '保存记录'}
+                      </button>
+                    </>
+                  )}
                 </div>
               </motion.div>
             )}

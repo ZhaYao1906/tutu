@@ -37,7 +37,7 @@ interface GameState {
   // 原有 actions
   setSelectedSpot: (spot: Spot | null) => void;
   setFilterType: (type: 'all' | 'scenic' | 'food' | 'culture' | 'personal') => void;
-  visitSpot: (spotId: string) => void;
+  visitSpot: (spotId: string, visitTime?: string) => void;
   updateQuestStatus: (questId: string, status: 'available' | 'inProgress' | 'completed') => void;
   addQuest: (quest: Quest) => void;
   addXp: (amount: number) => void;
@@ -47,6 +47,7 @@ interface GameState {
   register: (username: string, email: string, password: string, avatar?: string) => Promise<void>;
   logout: () => void;
   loadUserData: () => Promise<void>;
+  loadPublicSpots: () => Promise<void>;
   checkAuth: () => Promise<void>;
 
   // 编辑家/公司
@@ -74,7 +75,7 @@ export const useGameStore = create<GameState>((set, get) => ({
 
   setFilterType: (type) => set({ filterType: type }),
 
-  visitSpot: (spotId) => {
+  visitSpot: (spotId, visitTime) => {
     const state = get();
     const spot = state.spots.find(s => s.id === spotId);
     if (spot && !spot.visited) {
@@ -93,7 +94,7 @@ export const useGameStore = create<GameState>((set, get) => ({
 
       // 如果已登录，同步到后端
       if (state.isAuthenticated) {
-        spotsApi.visit(parseInt(spotId)).catch(console.error);
+        spotsApi.visit(parseInt(spotId), visitTime).catch(console.error);
       }
     }
   },
@@ -187,7 +188,11 @@ export const useGameStore = create<GameState>((set, get) => ({
 
   checkAuth: async () => {
     const token = TokenManager.getToken();
-    if (!token) return;
+    if (!token) {
+      // 未登录时也加载公开景点数据（保证未登录也能看到全部景点）
+      await get().loadPublicSpots();
+      return;
+    }
 
     try {
       const profile = await userApi.getProfile();
@@ -196,6 +201,20 @@ export const useGameStore = create<GameState>((set, get) => ({
       await get().loadUserData();
     } catch {
       TokenManager.removeToken();
+      // token 失效时也尝试加载公开数据
+      await get().loadPublicSpots();
+    }
+  },
+
+  // 加载公开景点数据（不依赖登录状态）
+  loadPublicSpots: async () => {
+    try {
+      const spotsData = await spotsApi.getAll();
+      if (spotsData && Array.isArray(spotsData) && spotsData.length > 0) {
+        set({ spots: spotsData as Spot[] });
+      }
+    } catch (error) {
+      console.error('加载公开景点数据失败:', error);
     }
   },
 
