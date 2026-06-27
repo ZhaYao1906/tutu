@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useGameStore } from '../store/gameStore';
+import { userApi } from '../services/api';
 import { mockSkills } from '../data/mockData';
 import LevelGrowth from './LevelGrowth';
 import AchievementSystem from './AchievementSystem';
@@ -11,7 +12,34 @@ type ProfileTab = 'home' | 'level' | 'achievements' | 'leaderboard' | 'account' 
 
 const PersonalCenter: React.FC = () => {
   const user = useGameStore(state => state.user);
+  const updateHomeCompany = useGameStore(state => state.updateHomeCompany);
+  const isAuthenticated = useGameStore(state => state.isAuthenticated);
   const [activeTab, setActiveTab] = useState<ProfileTab>('home');
+  const [editingType, setEditingType] = useState<'home' | 'company' | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editLocation, setEditLocation] = useState('');
+  const [settingsName, setSettingsName] = useState(user.name);
+
+  const handleSaveLocation = async () => {
+    if (!editingType) return;
+    try {
+      await updateHomeCompany(editingType, editName, editLocation);
+    } catch (error) {
+      console.error('保存位置失败:', error);
+    }
+    setEditingType(null);
+  };
+
+  const handleSaveSettings = async () => {
+    if (isAuthenticated) {
+      try {
+        await userApi.updateProfile({ username: settingsName });
+      } catch (error) {
+        console.error('保存用户名失败:', error);
+      }
+    }
+    useGameStore.setState(state => ({ user: { ...state.user, name: settingsName } }));
+  };
 
   const tabs = [
     { id: 'home', label: '我的家园', icon: '🏠' },
@@ -109,7 +137,14 @@ const PersonalCenter: React.FC = () => {
                       <div className="text-3xl mb-2">🏠</div>
                       <h4 className="text-lg font-bold text-white mb-2">{user.home?.name}</h4>
                       <p className="text-gray-400">{user.home?.location}</p>
-                      <button className="mt-4 text-sm text-tutu-gold hover:underline">
+                      <button
+                        onClick={() => {
+                          setEditingType('home');
+                          setEditName(user.home?.name || '');
+                          setEditLocation(user.home?.location || '');
+                        }}
+                        className="mt-4 text-sm text-tutu-gold hover:underline"
+                      >
                         编辑位置
                       </button>
                     </div>
@@ -117,7 +152,14 @@ const PersonalCenter: React.FC = () => {
                       <div className="text-3xl mb-2">🏢</div>
                       <h4 className="text-lg font-bold text-white mb-2">{user.company?.name}</h4>
                       <p className="text-gray-400">{user.company?.location}</p>
-                      <button className="mt-4 text-sm text-tutu-gold hover:underline">
+                      <button
+                        onClick={() => {
+                          setEditingType('company');
+                          setEditName(user.company?.name || '');
+                          setEditLocation(user.company?.location || '');
+                        }}
+                        className="mt-4 text-sm text-tutu-gold hover:underline"
+                      >
                         编辑位置
                       </button>
                     </div>
@@ -230,7 +272,7 @@ const PersonalCenter: React.FC = () => {
                         className="w-full bg-gray-800 rounded-lg px-4 py-3 text-white"
                       />
                     </div>
-                    <button className="btn-primary w-full">保存设置</button>
+                    <button onClick={handleSaveSettings} className="btn-primary w-full">保存设置</button>
                   </div>
                 </motion.div>
               )}
@@ -238,6 +280,76 @@ const PersonalCenter: React.FC = () => {
           </motion.div>
         </div>
       </motion.div>
+
+      <AnimatePresence>
+        {editingType && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4"
+            onClick={() => setEditingType(null)}
+          >
+            <motion.div
+              initial={{ scale: 0.8, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.8, opacity: 0 }}
+              className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-xl p-6 max-w-md w-full border border-gray-700 shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="text-2xl font-bold text-white">
+                  {editingType === 'home' ? '编辑家位置' : '编辑公司位置'}
+                </h3>
+                <button
+                  onClick={() => setEditingType(null)}
+                  className="text-gray-400 hover:text-white text-2xl"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div className="space-y-4 mb-6">
+                <div>
+                  <label className="block text-sm text-gray-400 mb-2">名称</label>
+                  <input
+                    type="text"
+                    value={editName}
+                    onChange={(e) => setEditName(e.target.value)}
+                    placeholder="请输入名称"
+                    className="w-full bg-gray-700 rounded-lg px-4 py-2 text-white placeholder-gray-500 focus:outline-none focus:border-tutu-gold"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm text-gray-400 mb-2">位置</label>
+                  <input
+                    type="text"
+                    value={editLocation}
+                    onChange={(e) => setEditLocation(e.target.value)}
+                    placeholder="请输入位置"
+                    className="w-full bg-gray-700 rounded-lg px-4 py-2 text-white placeholder-gray-500 focus:outline-none focus:border-tutu-gold"
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setEditingType(null)}
+                  className="flex-1 bg-gray-700 hover:bg-gray-600 text-white rounded-lg py-3 transition"
+                >
+                  取消
+                </button>
+                <button
+                  onClick={handleSaveLocation}
+                  className="flex-1 btn-primary"
+                >
+                  保存
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </section>
   );
 };

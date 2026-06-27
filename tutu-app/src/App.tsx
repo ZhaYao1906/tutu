@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Navbar from './components/Navbar';
 import Hero from './components/Hero';
@@ -6,11 +6,19 @@ import CityMap from './components/CityMap';
 import QuestCenter from './components/QuestCenter';
 import CityForum from './components/CityForum';
 import PersonalCenter from './components/PersonalCenter';
+import AuthModal from './components/AuthModal';
+import { useGameStore } from './store/gameStore';
 
 type TabType = 'hero' | 'explore' | 'quests' | 'forum' | 'profile';
 
 function App() {
   const [activeTab, setActiveTab] = useState<TabType>('hero');
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const checkAuth = useGameStore(state => state.checkAuth);
+
+  useEffect(() => {
+    checkAuth();
+  }, [checkAuth]);
 
   const handleTabChange = (tabId: string) => {
     setActiveTab(tabId as TabType);
@@ -18,8 +26,12 @@ function App() {
 
   return (
     <div className="h-screen w-screen overflow-hidden bg-tutu-bg flex flex-col">
-      <Navbar activeTab={activeTab} onTabChange={handleTabChange} />
-      
+      <Navbar
+        activeTab={activeTab}
+        onTabChange={handleTabChange}
+        onAuthClick={() => setShowAuthModal(true)}
+      />
+
       <div className="flex-1 relative overflow-hidden">
         <AnimatePresence mode="wait">
           {activeTab === 'hero' && (
@@ -34,7 +46,7 @@ function App() {
               <Hero onEnter={() => setActiveTab('explore')} />
             </motion.div>
           )}
-          
+
           {activeTab === 'explore' && (
             <motion.div
               key="explore"
@@ -47,7 +59,7 @@ function App() {
               <CityMap />
             </motion.div>
           )}
-          
+
           {activeTab === 'quests' && (
             <motion.div
               key="quests"
@@ -60,7 +72,7 @@ function App() {
               <QuestCenter />
             </motion.div>
           )}
-          
+
           {activeTab === 'forum' && (
             <motion.div
               key="forum"
@@ -73,7 +85,7 @@ function App() {
               <CityForum />
             </motion.div>
           )}
-          
+
           {activeTab === 'profile' && (
             <motion.div
               key="profile"
@@ -88,6 +100,12 @@ function App() {
           )}
         </AnimatePresence>
       </div>
+
+      <AuthModal
+        isOpen={showAuthModal}
+        onClose={() => setShowAuthModal(false)}
+        onAuthSuccess={() => setShowAuthModal(false)}
+      />
     </div>
   );
 }

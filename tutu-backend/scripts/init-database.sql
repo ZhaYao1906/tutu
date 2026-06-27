@@ -194,6 +194,21 @@ INSERT IGNORE INTO achievements (icon, name, description, xp, category, total) V
 ('🏔️', '长城英雄', '打卡长城', 200, 'explore', 1),
 ('🌟', '北京通', '探索所有北京景点', 500, 'explore', 43);
 
+-- 每日记录表（心情/日记）
+CREATE TABLE IF NOT EXISTS daily_records (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    user_id BIGINT NOT NULL,
+    date VARCHAR(20) NOT NULL,
+    mood VARCHAR(50),
+    mood_score INT,
+    diary TEXT,
+    weather VARCHAR(50),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id),
+    UNIQUE KEY unique_user_date (user_id, date)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 -- 插入测试用户（密码: 123456）
 INSERT IGNORE INTO users (username, email, password, avatar, level, title, xp, total_xp) VALUES
 ('城市探险家', 'test@tutu.com', '$2a$10$N.ZOn9G6/YLFixAOPMg/h.z7wCu6.vX5eJ3JxZxVfEj6Z5iF8XG.K', '🧭', 15, '探索者', 2400, 15000);

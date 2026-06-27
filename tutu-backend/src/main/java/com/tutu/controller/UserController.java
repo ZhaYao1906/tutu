@@ -45,4 +45,13 @@ public class UserController {
     public ResponseEntity<ApiResponse<List<User>>> getLeaderboard() {
         return ResponseEntity.ok(ApiResponse.success(userService.getLeaderboard()));
     }
+
+    @GetMapping("/level-info")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> getLevelInfo() {
+        Long userId = currentUser.getUserId();
+        User user = userService.getUserById(userId);
+        Map<String, Object> info = userService.getLevelInfo(user.getTotalXp());
+        info.put("title", user.getTitle());
+        return ResponseEntity.ok(ApiResponse.success(info));
+    }
 }

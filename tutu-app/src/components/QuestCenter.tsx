@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useGameStore } from '../store/gameStore';
 import { useXpPopup } from '../hooks/useXpPopup';
@@ -7,6 +7,8 @@ import XpPopupDisplay from './XpPopupDisplay';
 
 const QuestCenter: React.FC = () => {
   const { quests, updateQuestStatus, addQuest } = useGameStore();
+  const dailyRecords = useGameStore(state => state.dailyRecords);
+  const saveDailyRecord = useGameStore(state => state.saveDailyRecord);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [showAddTaskModal, setShowAddTaskModal] = useState(false);
@@ -18,6 +20,53 @@ const QuestCenter: React.FC = () => {
     xp: 100
   });
   const { popups, showXpPopup } = useXpPopup();
+
+  // 每日记录状态
+  const [dailyMood, setDailyMood] = useState('😊');
+  const [dailyScore, setDailyScore] = useState(3);
+  const [dailyDiary, setDailyDiary] = useState('');
+  const [dailyWeather, setDailyWeather] = useState('');
+  const [savingRecord, setSavingRecord] = useState(false);
+
+  const formatDate = (date: Date): string => {
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+  };
+
+  useEffect(() => {
+    if (selectedDate) {
+      const dateStr = formatDate(selectedDate);
+      const existing = dailyRecords.find(r => r.date === dateStr);
+      if (existing) {
+        setDailyMood(existing.mood || '😊');
+        setDailyScore(existing.moodScore || 3);
+        setDailyDiary(existing.diary || '');
+        setDailyWeather(existing.weather || '');
+      } else {
+        setDailyMood('😊');
+        setDailyScore(3);
+        setDailyDiary('');
+        setDailyWeather('');
+      }
+    }
+  }, [selectedDate, dailyRecords]);
+
+  const handleSaveDailyRecord = async () => {
+    if (!selectedDate) return;
+    setSavingRecord(true);
+    try {
+      await saveDailyRecord({
+        date: formatDate(selectedDate),
+        mood: dailyMood,
+        moodScore: dailyScore,
+        diary: dailyDiary,
+        weather: dailyWeather,
+      });
+    } catch (error) {
+      console.error('保存每日记录失败:', error);
+    } finally {
+      setSavingRecord(false);
+    }
+  };
 
   const getDaysInMonth = (date: Date) => {
     const year = date.getFullYear();
@@ -118,10 +167,10 @@ const QuestCenter: React.FC = () => {
       >
         <div className="flex-1">
           <h2 className="text-4xl font-game font-bold text-center mb-4 game-title">
-            任务中心
+            每日记录
           </h2>
           <p className="text-center text-gray-400 mb-8">
-            点击日期查看当天任务
+            记录每天的任务、心情与生活
           </p>
 
           <div className="card-game mb-6">
@@ -172,12 +221,15 @@ const QuestCenter: React.FC = () => {
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
                     onClick={() => setSelectedDate(new Date(currentDate.getFullYear(), currentDate.getMonth(), day))}
-                    className={`aspect-square rounded-lg flex flex-col items-center justify-center transition-all ${
+                    className={`aspect-square rounded-lg flex flex-col items-center justify-center transition-all relative ${
                       isSelected
                         ? 'bg-gradient-to-br from-tutu-gold to-tutu-orange text-gray-900'
                         : 'bg-gray-800 text-white hover:bg-gray-700'
                     }`}
                   >
+                    {dailyRecords.some(r => r.date === formatDate(new Date(currentDate.getFullYear(), currentDate.getMonth(), day))) && (
+                      <div className="w-2 h-2 rounded-full bg-tutu-blue absolute top-1 right-1" />
+                    )}
                     <div className="text-lg font-bold">{day}</div>
                     {dayQuests.length > 0 && (
                       <div className="flex gap-1 mt-1">
@@ -303,6 +355,68 @@ const QuestCenter: React.FC = () => {
                     当天暂无任务
                   </div>
                 )}
+
+                {/* 每日记录区域 */}
+                <div className="border-t border-gray-700 mt-4 pt-4">
+                  <h4 className="text-lg font-bold text-white mb-3">📝 每日记录</h4>
+
+                  {/* 心情选择 */}
+                  <div className="mb-3">
+                    <label className="text-gray-400 text-sm mb-2 block">今日心情</label>
+                    <div className="flex gap-2">
+                      {['😄', '😊', '😐', '😔', '😢'].map((emoji, i) => (
+                        <button
+                          key={emoji}
+                          onClick={() => { setDailyMood(emoji); setDailyScore(5 - i); }}
+                          className={`w-10 h-10 rounded-lg flex items-center justify-center text-xl transition ${
+                            dailyMood === emoji ? 'bg-tutu-gold/20 border-2 border-tutu-gold' : 'bg-gray-700 border border-gray-600'
+                          }`}
+                        >
+                          {emoji}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* 天气 */}
+                  <div className="mb-3">
+                    <label className="text-gray-400 text-sm mb-1 block">天气</label>
+                    <div className="flex gap-2">
+                      {['☀️', '⛅', '☁️', '🌧️', '❄️'].map((w) => (
+                        <button
+                          key={w}
+                          onClick={() => setDailyWeather(w)}
+                          className={`w-9 h-9 rounded-lg flex items-center justify-center transition ${
+                            dailyWeather === w ? 'bg-tutu-blue/20 border border-tutu-blue' : 'bg-gray-700 border border-gray-600'
+                          }`}
+                        >
+                          {w}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* 日记 */}
+                  <div className="mb-3">
+                    <label className="text-gray-400 text-sm mb-1 block">今日日记</label>
+                    <textarea
+                      value={dailyDiary}
+                      onChange={(e) => setDailyDiary(e.target.value)}
+                      placeholder="记录今天的故事..."
+                      className="w-full bg-gray-700 rounded-lg px-4 py-2 text-white text-sm"
+                      rows={3}
+                    />
+                  </div>
+
+                  {/* 保存按钮 */}
+                  <button
+                    onClick={handleSaveDailyRecord}
+                    disabled={savingRecord}
+                    className="w-full btn-primary disabled:opacity-50"
+                  >
+                    {savingRecord ? '保存中...' : '保存记录'}
+                  </button>
+                </div>
               </motion.div>
             )}
 

@@ -91,3 +91,33 @@ export interface LeaderboardPlayer {
   level: number;
   isCurrentUser?: boolean;
 }
+
+// 每日记录
+export interface DailyRecord {
+  id?: number;
+  date: string;        // YYYY-MM-DD
+  mood: string;        // 心情 emoji
+  moodScore: number;   // 1-5
+  diary: string;       // 日记内容
+  weather?: string;    // 天气
+}
+
+// 认证用户（后端返回的用户数据格式）
+export interface AuthUser {
+  id: number;
+  username: string;
+  email: string;
+  avatar: string;
+  level: number;
+  title: string;
+  xp: number;
+  totalXp: number;
+  spotsVisited: number;
+  questsCompleted: number;
+  achievementsUnlocked: number;
+  streakDays: number;
+  homeName?: string;
+  homeLocation?: string;
+  companyName?: string;
+  companyLocation?: string;
+}

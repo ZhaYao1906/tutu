@@ -1,29 +1,93 @@
-import React, { useState, useRef } from 'react';
+import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import {
+  ComposableMap,
+  Geographies,
+  Geography,
+  Marker,
+  ZoomableGroup,
+} from 'react-simple-maps';
 import { useGameStore } from '../store/gameStore';
 import { useXpPopup } from '../hooks/useXpPopup';
 import type { Spot } from '../types';
 import SpotModal from './SpotModal';
 import XpPopupDisplay from './XpPopupDisplay';
+import beijingGeo from '../data/beijing-geo.json';
+
+// 北京中心点 [经度, 纬度]
+const BEIJING_CENTER: [number, number] = [116.4, 40.15];
+
+// 将现有 SVG 像素坐标 (x: 0-900, y: 0-600) 转换为北京经纬度范围
+// 经度范围 115.7-117.4，纬度范围 39.4-41.6
+const pixelToLngLat = (x: number, y: number): [number, number] => {
+  const lng = 115.7 + (x / 900) * 1.7;
+  const lat = 41.6 - (y / 600) * 2.2;
+  return [lng, lat];
+};
+
+// 各行政区填充色（暗色调半透明渐变）
+const DISTRICT_FILL: Record<string, string> = {
+  东城区: '#4a3a2d',
+  西城区: '#4a2d3a',
+  朝阳区: '#2d3a5a',
+  丰台区: '#3a4a2d',
+  石景山区: '#3a2d4a',
+  海淀区: '#2d4a3f',
+  门头沟区: '#4a4a2d',
+  房山区: '#2d3a4a',
+  通州区: '#4a3a4a',
+  顺义区: '#2d4a3a',
+  昌平区: '#3a4a3a',
+  大兴区: '#2d4a4a',
+  怀柔区: '#3a3a4a',
+  平谷区: '#3a4a2d',
+  密云区: '#4a3a3a',
+  延庆区: '#4a4a4a',
+};
+
+// 各行政区边界发光色（亮色描边）
+const DISTRICT_STROKE: Record<string, string> = {
+  东城区: '#fb923c',
+  西城区: '#f87171',
+  朝阳区: '#60a5fa',
+  丰台区: '#86efac',
+  石景山区: '#a78bfa',
+  海淀区: '#4ade80',
+  门头沟区: '#fbbf24',
+  房山区: '#93c5fd',
+  通州区: '#d8b4fe',
+  顺义区: '#4ade80',
+  昌平区: '#86efac',
+  大兴区: '#67e8f9',
+  怀柔区: '#a5b4fc',
+  平谷区: '#bef264',
+  密云区: '#fca5a5',
+  延庆区: '#9ca3af',
+};
+
+interface MapPosition {
+  coordinates: [number, number];
+  zoom: number;
+}
 
 const CityMap: React.FC = () => {
   const { spots, filterType, setFilterType, visitSpot } = useGameStore();
   const [selectedSpot, setSelectedSpot] = useState<Spot | null>(null);
   const { popups, showXpPopup } = useXpPopup();
-  const [zoom, setZoom] = useState(1);
-  const [mapOffset, setMapOffset] = useState({ x: 0, y: 0 });
-  const svgRef = useRef<SVGSVGElement>(null);
+  const [position, setPosition] = useState<MapPosition>({
+    coordinates: BEIJING_CENTER,
+    zoom: 1,
+  });
 
-  const filteredSpots = filterType === 'all' 
-    ? spots 
-    : spots.filter(spot => spot.type === filterType);
+  const filteredSpots =
+    filterType === 'all' ? spots : spots.filter((spot) => spot.type === filterType);
 
   const handleSpotClick = (spot: Spot) => {
     setSelectedSpot(spot);
   };
 
   const handleVisit = (spotId: string, event: React.MouseEvent) => {
-    const spot = spots.find(s => s.id === spotId);
+    const spot = spots.find((s) => s.id === spotId);
     if (spot && !spot.visited) {
       visitSpot(spotId);
       showXpPopup(event.clientX, event.clientY, spot.xp);
@@ -33,11 +97,16 @@ const CityMap: React.FC = () => {
 
   const getSpotColor = (type: string) => {
     switch (type) {
-      case 'scenic': return '#fbbf24';
-      case 'food': return '#fb923c';
-      case 'culture': return '#a78bfa';
-      case 'personal': return '#34d399';
-      default: return '#60a5fa';
+      case 'scenic':
+        return '#fbbf24';
+      case 'food':
+        return '#fb923c';
+      case 'culture':
+        return '#a78bfa';
+      case 'personal':
+        return '#34d399';
+      default:
+        return '#60a5fa';
     }
   };
 
@@ -50,38 +119,15 @@ const CityMap: React.FC = () => {
   ];
 
   const handleZoomIn = () => {
-    setZoom(prev => Math.min(prev + 0.2, 2));
+    setPosition((prev) => ({ ...prev, zoom: Math.min(prev.zoom * 1.4, 5) }));
   };
 
   const handleZoomOut = () => {
-    setZoom(prev => Math.max(prev - 0.2, 0.5));
+    setPosition((prev) => ({ ...prev, zoom: Math.max(prev.zoom / 1.4, 0.5) }));
   };
 
   const handleResetZoom = () => {
-    setZoom(1);
-    setMapOffset({ x: 0, y: 0 });
-  };
-
-  const handleMouseDown = (e: React.MouseEvent) => {
-    if (svgRef.current) {
-      const startX = e.clientX - mapOffset.x;
-      const startY = e.clientY - mapOffset.y;
-      
-      const handleMouseMove = (moveEvent: MouseEvent) => {
-        setMapOffset({
-          x: moveEvent.clientX - startX,
-          y: moveEvent.clientY - startY
-        });
-      };
-      
-      const handleMouseUp = () => {
-        document.removeEventListener('mousemove', handleMouseMove);
-        document.removeEventListener('mouseup', handleMouseUp);
-      };
-      
-      document.addEventListener('mousemove', handleMouseMove);
-      document.addEventListener('mouseup', handleMouseUp);
-    }
+    setPosition({ coordinates: BEIJING_CENTER, zoom: 1 });
   };
 
   return (
@@ -147,229 +193,195 @@ const CityMap: React.FC = () => {
           </div>
 
           <div className="absolute top-4 left-4 text-sm text-gray-400 z-10">
-            缩放: {Math.round(zoom * 100)}%
+            缩放: {Math.round(position.zoom * 100)}%
           </div>
 
-          <div
-            className="overflow-hidden"
-            style={{ cursor: zoom > 1 ? 'grab' : 'default' }}
-            onMouseDown={zoom > 1 ? handleMouseDown : undefined}
-          >
-            <svg
-              ref={svgRef}
-              viewBox="0 0 900 600"
-              className="w-full h-auto"
-              style={{
-                minHeight: '450px',
-                transform: `scale(${zoom}) translate(${mapOffset.x / zoom}px, ${mapOffset.y / zoom}px)`,
-                transformOrigin: 'center',
-                transition: 'transform 0.3s ease'
+          <div className="overflow-hidden" style={{ background: '#1a1f2e' }}>
+            <ComposableMap
+              projection="geoMercator"
+              projectionConfig={{
+                scale: 20000,
+                center: BEIJING_CENTER,
               }}
+              width={800}
+              height={600}
+              style={{ width: '100%', height: 'auto', background: '#1a1f2e' }}
             >
               <defs>
-                <filter id="glow">
-                  <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+                <filter id="district-glow" x="-20%" y="-20%" width="140%" height="140%">
+                  <feGaussianBlur stdDeviation="1.1" result="blur" />
                   <feMerge>
-                    <feMergeNode in="coloredBlur"/>
-                    <feMergeNode in="SourceGraphic"/>
+                    <feMergeNode in="blur" />
+                    <feMergeNode in="SourceGraphic" />
                   </feMerge>
                 </filter>
-                <linearGradient id="riverGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                  <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.8"/>
-                  <stop offset="100%" stopColor="#06b6d4" stopOpacity="0.8"/>
-                </linearGradient>
+                <filter id="marker-glow" x="-150%" y="-150%" width="400%" height="400%">
+                  <feGaussianBlur stdDeviation="3" result="blur" />
+                  <feMerge>
+                    <feMergeNode in="blur" />
+                    <feMergeNode in="SourceGraphic" />
+                  </feMerge>
+                </filter>
               </defs>
 
-              <rect width="900" height="600" fill="#1a1f2e" />
+              <ZoomableGroup
+                center={position.coordinates}
+                zoom={position.zoom}
+                minZoom={0.5}
+                maxZoom={5}
+                translateExtent={[[-300, -300], [1100, 900]]}
+                onMoveEnd={setPosition}
+              >
+                <Geographies geography={beijingGeo}>
+                  {({ geographies, path }) => (
+                    <>
+                      {geographies.map((geo: any) => {
+                        const name: string = geo.properties?.name ?? '';
+                        const fill = DISTRICT_FILL[name] ?? '#2d3a4a';
+                        const stroke = DISTRICT_STROKE[name] ?? '#4a90e2';
+                        return (
+                          <Geography
+                            key={geo.rsmKey ?? name}
+                            geography={geo}
+                            filter="url(#district-glow)"
+                            style={{
+                              default: {
+                                fill,
+                                stroke,
+                                strokeWidth: 0.6,
+                                opacity: 0.55,
+                                transition: 'all 0.25s ease',
+                              },
+                              hover: {
+                                fill,
+                                stroke,
+                                strokeWidth: 1.6,
+                                opacity: 0.9,
+                                transition: 'all 0.25s ease',
+                              },
+                              pressed: {
+                                fill,
+                                stroke,
+                                strokeWidth: 1.6,
+                                opacity: 0.95,
+                              },
+                            }}
+                          />
+                        );
+                      })}
 
-              <ellipse cx="450" cy="400" rx="200" ry="150" fill="#1e3a5f" opacity="0.3"/>
+                      {geographies.map((geo: any) => {
+                        const name: string = geo.properties?.name ?? '';
+                        const centroid = path.centroid(geo);
+                        if (
+                          !centroid ||
+                          Number.isNaN(centroid[0]) ||
+                          Number.isNaN(centroid[1])
+                        ) {
+                          return null;
+                        }
+                        return (
+                          <text
+                            key={`label-${geo.rsmKey ?? name}`}
+                            x={centroid[0]}
+                            y={centroid[1]}
+                            textAnchor="middle"
+                            dominantBaseline="middle"
+                            fontSize={9}
+                            fontWeight="bold"
+                            style={{
+                              pointerEvents: 'none',
+                              fill: '#e2e8f0',
+                              stroke: '#0b1020',
+                              strokeWidth: 2.5,
+                              paintOrder: 'stroke',
+                              strokeLinejoin: 'round',
+                            }}
+                          >
+                            {name}
+                          </text>
+                        );
+                      })}
+                    </>
+                  )}
+                </Geographies>
 
-              <g opacity="0.2">
-                <path d="M100,50 L120,40 L140,55 L160,35 L180,50" stroke="#4a5568" strokeWidth="1" fill="none"/>
-                <path d="M700,80 L720,70 L740,85 L760,65 L780,80" stroke="#4a5568" strokeWidth="1" fill="none"/>
-                <path d="M800,200 L820,190 L840,205 L860,185 L880,200" stroke="#4a5568" strokeWidth="1" fill="none"/>
-              </g>
-
-              <g className="mountains">
-                <path d="M50,500 L70,450 L90,480 L110,430 L130,470 L150,440 L170,490" fill="#374151" opacity="0.8"/>
-                <path d="M60,460 L80,430 L100,450 L120,420 L140,450" fill="#4b5563" opacity="0.6"/>
-                <path d="M70,440 L90,410 L110,430" fill="#6b7280" opacity="0.4"/>
-                <path d="M180,520 L200,470 L220,500 L240,450 L260,490" fill="#374151" opacity="0.8"/>
-                <path d="M650,540 L670,490 L690,520 L710,470 L730,510" fill="#374151" opacity="0.8"/>
-                <path d="M660,500 L680,470 L700,490" fill="#4b5563" opacity="0.6"/>
-                <path d="M800,350 L820,300 L840,330 L860,280 L880,320" fill="#374151" opacity="0.8"/>
-              </g>
-
-              <path d="M550,350 Q600,330 650,350 Q700,370 750,350" stroke="url(#riverGradient)" strokeWidth="8" fill="none"/>
-              <path d="M400,450 Q450,430 500,450 Q550,470 600,450" stroke="url(#riverGradient)" strokeWidth="6" fill="none"/>
-              <path d="M300,300 Q350,280 400,300" stroke="url(#riverGradient)" strokeWidth="4" fill="none"/>
-              <path d="M600,200 Q650,180 700,200" stroke="url(#riverGradient)" strokeWidth="4" fill="none"/>
-
-              <g>
-                <path d="M380,250 L420,230 L460,250 L480,290 L460,330 L420,350 L380,330 L360,290 Z" fill="#2d4a3f" stroke="#4ade80" strokeWidth="2" opacity="0.8"/>
-                <text x="420" y="295" textAnchor="middle" fill="#4ade80" fontSize="12" fontWeight="bold">海淀区</text>
-                
-                <path d="M460,250 L500,230 L540,250 L560,290 L540,330 L500,350 L460,330 Z" fill="#2d3a5a" stroke="#60a5fa" strokeWidth="2" opacity="0.8"/>
-                <text x="500" y="295" textAnchor="middle" fill="#60a5fa" fontSize="12" fontWeight="bold">朝阳区</text>
-                
-                <path d="M420,350 L460,330 L500,350 L520,390 L500,430 L460,450 L420,430 L400,390 Z" fill="#4a3a2d" stroke="#fb923c" strokeWidth="2" opacity="0.8"/>
-                <text x="460" y="400" textAnchor="middle" fill="#fb923c" fontSize="12" fontWeight="bold">东城区</text>
-                
-                <path d="M380,330 L420,350 L400,390 L360,410 L340,370 Z" fill="#4a2d3a" stroke="#f87171" strokeWidth="2" opacity="0.8"/>
-                <text x="390" y="375" textAnchor="middle" fill="#f87171" fontSize="12" fontWeight="bold">西城区</text>
-                
-                <path d="M460,450 L500,430 L520,390 L560,410 L580,450 L540,490 L500,470 Z" fill="#3a4a2d" stroke="#86efac" strokeWidth="2" opacity="0.8"/>
-                <text x="520" y="445" textAnchor="middle" fill="#86efac" fontSize="12" fontWeight="bold">丰台区</text>
-                
-                <path d="M340,370 L380,330 L360,410 L320,430 L300,390 Z" fill="#3a2d4a" stroke="#a78bfa" strokeWidth="2" opacity="0.8"/>
-                <text x="330" y="405" textAnchor="middle" fill="#a78bfa" fontSize="12" fontWeight="bold">石景山区</text>
-                
-                <path d="M500,470 L540,490 L560,450 L600,470 L620,510 L580,550 L540,530 Z" fill="#2d4a4a" stroke="#67e8f9" strokeWidth="2" opacity="0.8"/>
-                <text x="560" y="505" textAnchor="middle" fill="#67e8f9" fontSize="12" fontWeight="bold">大兴区</text>
-                
-                <path d="M400,430 L420,450 L400,490 L360,510 L340,470 Z" fill="#4a4a2d" stroke="#fbbf24" strokeWidth="2" opacity="0.8"/>
-                <text x="375" y="475" textAnchor="middle" fill="#fbbf24" fontSize="12" fontWeight="bold">门头沟区</text>
-                
-                <path d="M340,470 L360,510 L320,550 L280,530 L260,490 Z" fill="#2d3a4a" stroke="#93c5fd" strokeWidth="2" opacity="0.8"/>
-                <text x="300" y="510" textAnchor="middle" fill="#93c5fd" fontSize="12" fontWeight="bold">房山区</text>
-                
-                <path d="M540,530 L580,550 L620,510 L660,530 L680,570 L640,600 L600,580 Z" fill="#4a3a4a" stroke="#d8b4fe" strokeWidth="2" opacity="0.8"/>
-                <text x="620" y="565" textAnchor="middle" fill="#d8b4fe" fontSize="12" fontWeight="bold">通州区</text>
-                
-                <path d="M460,330 L500,350 L480,290 L520,270 L540,310 Z" fill="#2d4a3a" stroke="#4ade80" strokeWidth="2" opacity="0.8"/>
-                <text x="490" y="305" textAnchor="middle" fill="#4ade80" fontSize="12" fontWeight="bold">顺义区</text>
-                
-                <path d="M380,250 L420,230 L380,190 L340,210 L360,250 Z" fill="#3a4a3a" stroke="#86efac" strokeWidth="2" opacity="0.8"/>
-                <text x="375" y="235" textAnchor="middle" fill="#86efac" fontSize="12" fontWeight="bold">昌平区</text>
-                
-                <path d="M300,200 L340,210 L380,190 L360,150 L320,160 Z" fill="#4a4a4a" stroke="#9ca3af" strokeWidth="2" opacity="0.8"/>
-                <text x="330" y="185" textAnchor="middle" fill="#9ca3af" fontSize="12" fontWeight="bold">延庆区</text>
-                
-                <path d="M420,180 L460,160 L500,180 L480,220 L440,200 Z" fill="#3a3a4a" stroke="#a5b4fc" strokeWidth="2" opacity="0.8"/>
-                <text x="450" y="200" textAnchor="middle" fill="#a5b4fc" fontSize="12" fontWeight="bold">怀柔区</text>
-                
-                <path d="M500,180 L540,160 L580,180 L560,220 L520,200 Z" fill="#4a3a3a" stroke="#fca5a5" strokeWidth="2" opacity="0.8"/>
-                <text x="535" y="200" textAnchor="middle" fill="#fca5a5" fontSize="12" fontWeight="bold">密云区</text>
-                
-                <path d="M560,250 L600,230 L640,250 L620,290 L580,270 Z" fill="#3a4a2d" stroke="#bef264" strokeWidth="2" opacity="0.8"/>
-                <text x="595" y="275" textAnchor="middle" fill="#bef264" fontSize="12" fontWeight="bold">平谷区</text>
-              </g>
-
-              <g>
-                <rect x="45" y="480" width="80" height="60" fill="#1f2937" opacity="0.8" rx="8"/>
-                <text x="85" y="500" textAnchor="middle" fill="#9ca3af" fontSize="10">西山山脉</text>
-                <circle cx="60" cy="520" r="10" fill="#6b7280" opacity="0.6"/>
-                <circle cx="90" cy="530" r="8" fill="#6b7280" opacity="0.6"/>
-                
-                <rect x="630" y="510" width="80" height="60" fill="#1f2937" opacity="0.8" rx="8"/>
-                <text x="670" y="530" textAnchor="middle" fill="#9ca3af" fontSize="10">军都山脉</text>
-                <circle cx="645" cy="550" r="10" fill="#6b7280" opacity="0.6"/>
-                <circle cx="675" cy="560" r="8" fill="#6b7280" opacity="0.6"/>
-                
-                <rect x="780" y="330" width="80" height="60" fill="#1f2937" opacity="0.8" rx="8"/>
-                <text x="820" y="350" textAnchor="middle" fill="#9ca3af" fontSize="10">燕山山脉</text>
-                <circle cx="795" cy="370" r="10" fill="#6b7280" opacity="0.6"/>
-                <circle cx="825" cy="380" r="8" fill="#6b7280" opacity="0.6"/>
-              </g>
-
-              <g>
-                <circle cx="450" cy="320" r="30" fill="#fbbf24" opacity="0.2"/>
-                <circle cx="450" cy="320" r="20" fill="#fbbf24" opacity="0.1"/>
-                <text x="450" y="315" textAnchor="middle" fill="#fbbf24" fontSize="16" fontWeight="bold">紫禁城</text>
-                <text x="450" y="335" textAnchor="middle" fill="#fbbf24" fontSize="10">故宫博物院</text>
-                
-                <circle cx="400" cy="280" r="25" fill="#60a5fa" opacity="0.2"/>
-                <text x="400" y="275" textAnchor="middle" fill="#60a5fa" fontSize="14" fontWeight="bold">圆明园</text>
-                
-                <circle cx="480" cy="280" r="25" fill="#34d399" opacity="0.2"/>
-                <text x="480" y="275" textAnchor="middle" fill="#34d399" fontSize="14" fontWeight="bold">颐和园</text>
-                
-                <circle cx="520" cy="380" r="25" fill="#a78bfa" opacity="0.2"/>
-                <text x="520" y="375" textAnchor="middle" fill="#a78bfa" fontSize="14" fontWeight="bold">三里屯</text>
-                
-                <circle cx="420" cy="380" r="25" fill="#fb923c" opacity="0.2"/>
-                <text x="420" y="375" textAnchor="middle" fill="#fb923c" fontSize="14" fontWeight="bold">王府井</text>
-                
-                <circle cx="360" cy="350" r="25" fill="#f87171" opacity="0.2"/>
-                <text x="360" y="345" textAnchor="middle" fill="#f87171" fontSize="14" fontWeight="bold">天安门</text>
-                
-                <circle cx="560" cy="340" r="25" fill="#67e8f9" opacity="0.2"/>
-                <text x="560" y="335" textAnchor="middle" fill="#67e8f9" fontSize="14" fontWeight="bold">鸟巢</text>
-                
-                <circle cx="320" cy="420" r="25" fill="#fbbf24" opacity="0.2"/>
-                <text x="320" y="415" textAnchor="middle" fill="#fbbf24" fontSize="14" fontWeight="bold">首钢园</text>
-                
-                <circle cx="600" cy="480" r="25" fill="#34d399" opacity="0.2"/>
-                <text x="600" y="475" textAnchor="middle" fill="#34d399" fontSize="14" fontWeight="bold">大兴机场</text>
-                
-                <circle cx="300" cy="520" r="25" fill="#a78bfa" opacity="0.2"/>
-                <text x="300" y="515" textAnchor="middle" fill="#a78bfa" fontSize="14" fontWeight="bold">十渡</text>
-                
-                <circle cx="480" cy="520" r="25" fill="#60a5fa" opacity="0.2"/>
-                <text x="480" y="515" textAnchor="middle" fill="#60a5fa" fontSize="14" fontWeight="bold">亦庄</text>
-                
-                <circle cx="640" cy="560" r="25" fill="#fb923c" opacity="0.2"/>
-                <text x="640" y="555" textAnchor="middle" fill="#fb923c" fontSize="14" fontWeight="bold">环球影城</text>
-                
-                <circle cx="450" cy="180" r="25" fill="#67e8f9" opacity="0.2"/>
-                <text x="450" y="175" textAnchor="middle" fill="#67e8f9" fontSize="14" fontWeight="bold">雁栖湖</text>
-                
-                <circle cx="330" cy="180" r="25" fill="#f87171" opacity="0.2"/>
-                <text x="330" y="175" textAnchor="middle" fill="#f87171" fontSize="14" fontWeight="bold">八达岭</text>
-                
-                <circle cx="530" cy="180" r="25" fill="#fbbf24" opacity="0.2"/>
-                <text x="530" y="175" textAnchor="middle" fill="#fbbf24" fontSize="14" fontWeight="bold">密云水库</text>
-                
-                <circle cx="600" cy="280" r="25" fill="#34d399" opacity="0.2"/>
-                <text x="600" y="275" textAnchor="middle" fill="#34d399" fontSize="14" fontWeight="bold">金海湖</text>
-              </g>
-
-              <AnimatePresence>
-                {filteredSpots.map((spot) => (
-                  <motion.g
-                    key={spot.id}
-                    initial={{ opacity: 0, scale: 0 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0 }}
-                    transition={{ duration: 0.3 }}
-                    onClick={() => handleSpotClick(spot)}
-                    style={{ cursor: 'pointer' }}
-                  >
-                    <circle
-                      cx={spot.coordinates.x}
-                      cy={spot.coordinates.y}
-                      r={spot.visited ? 8 : 12}
-                      fill={getSpotColor(spot.type)}
-                      filter="url(#glow)"
-                      opacity={spot.visited ? 0.6 : 1}
-                      stroke={spot.visited ? '#fff' : 'transparent'}
-                      strokeWidth={spot.visited ? 2 : 0}
-                    />
-                    <text
-                      x={spot.coordinates.x}
-                      y={spot.coordinates.y + 25}
-                      textAnchor="middle"
-                      fill="#fff"
-                      fontSize="12"
-                      opacity={0.8}
+                {filteredSpots.map((spot) => {
+                  const [lng, lat] = pixelToLngLat(
+                    spot.coordinates.x,
+                    spot.coordinates.y
+                  );
+                  const color = getSpotColor(spot.type);
+                  return (
+                    <Marker
+                      key={spot.id}
+                      coordinates={[lng, lat]}
+                      style={{ default: { cursor: 'pointer' }, hover: { cursor: 'pointer' } }}
                     >
-                      {spot.name}
-                    </text>
-                    {spot.visited && (
+                      {!spot.visited && (
+                        <circle
+                          r={10}
+                          fill={color}
+                          opacity={0.25}
+                          pointerEvents="none"
+                        >
+                          <animate
+                            attributeName="r"
+                            values="8;14;8"
+                            dur="2.4s"
+                            repeatCount="indefinite"
+                          />
+                          <animate
+                            attributeName="opacity"
+                            values="0.35;0.05;0.35"
+                            dur="2.4s"
+                            repeatCount="indefinite"
+                          />
+                        </circle>
+                      )}
+                      <circle
+                        r={spot.visited ? 5 : 7}
+                        fill={color}
+                        stroke={spot.visited ? '#ffffff' : color}
+                        strokeWidth={spot.visited ? 1.5 : 1}
+                        opacity={spot.visited ? 0.55 : 1}
+                        filter="url(#marker-glow)"
+                        onClick={() => handleSpotClick(spot)}
+                        style={{ cursor: 'pointer' }}
+                      />
+                      {spot.visited && (
+                        <text
+                          y={2}
+                          textAnchor="middle"
+                          fontSize={8}
+                          fill="#ffffff"
+                          fontWeight="bold"
+                          style={{ pointerEvents: 'none' }}
+                        >
+                          ✓
+                        </text>
+                      )}
                       <text
-                        x={spot.coordinates.x}
-                        y={spot.coordinates.y - 5}
+                        y={spot.visited ? -12 : -14}
                         textAnchor="middle"
-                        fill="#fff"
-                        fontSize="10"
+                        fontSize={9}
+                        fill="#f1f5f9"
+                        fontWeight="bold"
+                        style={{
+                          pointerEvents: 'none',
+                          stroke: '#0b1020',
+                          strokeWidth: 2.5,
+                          paintOrder: 'stroke',
+                          strokeLinejoin: 'round',
+                        }}
                       >
-                        ✓
+                        {spot.name}
                       </text>
-                    )}
-                  </motion.g>
-                ))}
-              </AnimatePresence>
-            </svg>
+                    </Marker>
+                  );
+                })}
+              </ZoomableGroup>
+            </ComposableMap>
           </div>
         </div>
 

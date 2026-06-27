@@ -4,7 +4,23 @@
 
 ## 快速启动指南
 
-### 1. 启动数据库
+### 一键启动（推荐）
+
+```bash
+# 在项目根目录执行
+bash start.sh
+```
+
+脚本会自动启动 MySQL、后端、前端，并显示访问地址。
+
+```bash
+# 一键停止所有服务
+bash stop.sh
+```
+
+### 手动启动（逐个启动）
+
+#### 1. 启动数据库
 ```bash
 # 启动MySQL服务
 mysqld_safe --datadir=/opt/homebrew/var/mysql &
@@ -13,7 +29,7 @@ mysqld_safe --datadir=/opt/homebrew/var/mysql &
 mysql -u root -proot123 -e "USE tutu_db; SHOW TABLES;"
 ```
 
-### 2. 启动后端
+#### 2. 启动后端
 ```bash
 cd tutu-backend
 
@@ -26,7 +42,7 @@ java -jar target/tutu-backend-1.0.0.jar
 
 后端服务地址：http://localhost:8080
 
-### 3. 启动前端
+#### 3. 启动前端
 ```bash
 cd tutu-app
 
@@ -39,8 +55,10 @@ npm run dev
 
 前端访问地址：http://localhost:5173
 
-### 4. 访问应用
+#### 4. 访问应用
 打开浏览器访问 http://localhost:5173，即可使用拓图应用。
+
+测试账号：`test@tutu.com` / 密码 `123456`
 
 ## 项目结构
 
