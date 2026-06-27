@@ -40,10 +40,20 @@ echo ""
 # 2. 启动后端
 echo -e "${YELLOW}[2/4] 启动 Java 后端服务...${NC}"
 BACKEND_PID_FILE="$PID_DIR/backend.pid"
+
+# 先通过 PID 文件停止
 if [ -f "$BACKEND_PID_FILE" ] && kill -0 "$(cat "$BACKEND_PID_FILE")" 2>/dev/null; then
-  echo -e "${YELLOW}  后端已在运行，先停止旧进程...${NC}"
+  echo -e "${YELLOW}  停止旧的后端进程...${NC}"
   kill "$(cat "$BACKEND_PID_FILE")" 2>/dev/null
   sleep 2
+fi
+
+# 再通过端口检查，确保端口 8080 没被占用
+PORT_PID=$(lsof -ti:8080 2>/dev/null)
+if [ -n "$PORT_PID" ]; then
+  echo -e "${YELLOW}  端口 8080 被占用，清理进程 (PID: $PORT_PID)...${NC}"
+  kill -9 "$PORT_PID" 2>/dev/null
+  sleep 1
 fi
 
 cd "$PROJECT_DIR/tutu-backend"
@@ -53,7 +63,7 @@ echo $! > "$BACKEND_PID_FILE"
 # 等待后端启动
 echo -e "${YELLOW}  等待后端启动...${NC}"
 for i in $(seq 1 30); do
-  if curl -s http://localhost:8080/api/spots | grep -q "[" 2>/dev/null; then
+  if curl -s http://localhost:8080/api/spots | grep -qF "[" 2>/dev/null; then
     echo -e "${GREEN}  ✓ 后端启动成功 (http://localhost:8080)${NC}"
     break
   fi
@@ -67,11 +77,23 @@ echo ""
 # 3. 启动前端
 echo -e "${YELLOW}[3/4] 启动 React 前端服务...${NC}"
 FRONTEND_PID_FILE="$PID_DIR/frontend.pid"
+
+# 先通过 PID 文件停止
 if [ -f "$FRONTEND_PID_FILE" ] && kill -0 "$(cat "$FRONTEND_PID_FILE")" 2>/dev/null; then
-  echo -e "${YELLOW}  前端已在运行，先停止旧进程...${NC}"
+  echo -e "${YELLOW}  停止旧的前端进程...${NC}"
   kill "$(cat "$FRONTEND_PID_FILE")" 2>/dev/null
   sleep 2
 fi
+
+# 再通过端口检查，清理 5173-5179 范围内的占用
+for port in 5173 5174 5175 5176 5177 5178 5179; do
+  PORT_PID=$(lsof -ti:$port 2>/dev/null)
+  if [ -n "$PORT_PID" ]; then
+    echo -e "${YELLOW}  端口 $port 被占用，清理进程 (PID: $PORT_PID)...${NC}"
+    kill -9 "$PORT_PID" 2>/dev/null
+    sleep 1
+  fi
+done
 
 cd "$PROJECT_DIR/tutu-app"
 nohup npm run dev > "$PID_DIR/frontend.log" 2>&1 &
@@ -79,14 +101,16 @@ echo $! > "$FRONTEND_PID_FILE"
 
 # 等待前端启动
 echo -e "${YELLOW}  等待前端启动...${NC}"
+FRONTEND_URL=""
 for i in $(seq 1 20); do
-  FRONTEND_URL=$(grep -oP 'http://localhost:\d+' "$PID_DIR/frontend.log" 2>/dev/null | head -1)
+  FRONTEND_URL=$(grep -oE 'http://localhost:[0-9]+' "$PID_DIR/frontend.log" 2>/dev/null | head -1)
   if [ -n "$FRONTEND_URL" ]; then
     echo -e "${GREEN}  ✓ 前端启动成功 ($FRONTEND_URL)${NC}"
     break
   fi
   if [ $i -eq 20 ]; then
     echo -e "${RED}  ✗ 前端启动超时，请查看日志: $PID_DIR/frontend.log${NC}"
+    FRONTEND_URL="http://localhost:5173"
   fi
   sleep 1
 done
