@@ -59,6 +59,18 @@ CREATE TABLE IF NOT EXISTS user_spots (
     UNIQUE KEY unique_user_spot (user_id, spot_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- 自定义打卡表
+CREATE TABLE IF NOT EXISTS custom_check_ins (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    user_id BIGINT NOT NULL,
+    name VARCHAR(100) NOT NULL,
+    description VARCHAR(500),
+    latitude DOUBLE NOT NULL,
+    longitude DOUBLE NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 -- 任务表
 CREATE TABLE IF NOT EXISTS quests (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,

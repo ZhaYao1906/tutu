@@ -6,7 +6,9 @@ import { useGameStore } from '../store/gameStore';
 import { useXpPopup } from '../hooks/useXpPopup';
 import type { Spot } from '../types';
 import SpotModal from './SpotModal';
+import CustomCheckInModal from './CustomCheckInModal';
 import XpPopupDisplay from './XpPopupDisplay';
+import { customCheckInApi } from '../services/api';
 import beijingGeo from '../data/beijing-geo.json';
 
 // 将现有 SVG 像素坐标转换为经纬度 [lng, lat]
@@ -40,6 +42,8 @@ const CityMap: React.FC = () => {
   const { spots, filterType, setFilterType, visitSpot } = useGameStore();
   const [selectedSpot, setSelectedSpot] = useState<Spot | null>(null);
   const { popups, showXpPopup } = useXpPopup();
+  const [isCustomMode, setIsCustomMode] = useState(false);
+  const [pendingPosition, setPendingPosition] = useState<{ lat: number; lng: number } | null>(null);
 
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
@@ -151,6 +155,15 @@ const CityMap: React.FC = () => {
 
     map.on('zoomend', updateLabels);
     updateLabels();
+
+    // 自定义打卡模式点击处理
+    const handleMapClick = (e: L.LeafletMouseEvent) => {
+      if (isCustomMode) {
+        setPendingPosition({ lat: e.latlng.lat, lng: e.latlng.lng });
+      }
+    };
+    map.on('click', handleMapClick);
+
     setMapReady(true);
 
     return () => {
@@ -158,7 +171,7 @@ const CityMap: React.FC = () => {
       mapRef.current = null;
       setMapReady(false);
     };
-  }, []);
+  }, [isCustomMode]);
 
   // 更新标记点
   useEffect(() => {
@@ -234,6 +247,23 @@ const CityMap: React.FC = () => {
     setSelectedSpot(null);
   };
 
+  const handleCustomCheckInConfirm = async (name: string, description: string) => {
+    if (!pendingPosition) return;
+    try {
+      const result = await customCheckInApi.create({
+        name,
+        description,
+        latitude: pendingPosition.lat,
+        longitude: pendingPosition.lng,
+      });
+      showXpPopup(window.innerWidth / 2, window.innerHeight / 2, 10);
+      setPendingPosition(null);
+      setIsCustomMode(false);
+    } catch (error) {
+      console.error('自定义打卡失败:', error);
+    }
+  };
+
   const filterButtons = [
     { type: 'all', label: '全部', icon: '🗺️' },
     { type: 'scenic', label: '景点', icon: '🏛️' },
@@ -274,11 +304,24 @@ const CityMap: React.FC = () => {
               {btn.label}
             </motion.button>
           ))}
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={() => setIsCustomMode(!isCustomMode)}
+            className={`px-4 py-2 rounded-lg font-medium transition-all text-sm ${
+              isCustomMode
+                ? 'bg-gradient-to-r from-tutu-emerald to-tutu-teal text-gray-900 glow-emerald'
+                : 'bg-gray-800 text-gray-300 border border-gray-700 hover:border-tutu-emerald'
+            }`}
+          >
+            <span className="mr-1">✨</span>
+            {isCustomMode ? '退出自定义' : '自定义打卡'}
+          </motion.button>
         </div>
 
         <div className="card-game overflow-hidden relative">
           <div className="absolute top-3 left-3 z-[1000] bg-gray-900/80 backdrop-blur px-3 py-1.5 rounded-lg text-xs text-gray-300 border border-gray-700">
-            💡 滚轮缩放 · 拖拽平移 · 越放大越精细
+            💡 滚轮缩放 · 拖拽平移 · {isCustomMode ? '点击地图选点打卡' : '越放大越精细'}
           </div>
 
           {/* Leaflet 地图容器 */}
@@ -295,6 +338,13 @@ const CityMap: React.FC = () => {
               spot={selectedSpot}
               onClose={() => setSelectedSpot(null)}
               onVisit={(e) => handleVisit(selectedSpot.id, e)}
+            />
+          )}
+          {pendingPosition && (
+            <CustomCheckInModal
+              position={pendingPosition}
+              onClose={() => setPendingPosition(null)}
+              onConfirm={handleCustomCheckInConfirm}
             />
           )}
         </AnimatePresence>

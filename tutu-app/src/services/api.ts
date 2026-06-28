@@ -239,4 +239,24 @@ export const accountApi = {
     }),
 };
 
+// Custom Check-ins API
+export interface CustomCheckIn {
+  id: number;
+  name: string;
+  description: string;
+  latitude: number;
+  longitude: number;
+  createdAt: string;
+}
+
+export const customCheckInApi = {
+  getAll: () => request<CustomCheckIn[]>('/custom-check-ins', { method: 'GET' }),
+
+  create: (data: { name: string; description: string; latitude: number; longitude: number }) =>
+    request<{ id: number; name: string; description: string; latitude: number; longitude: number; createdAt: string; user: AuthUser }>('/custom-check-ins', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+};
+
 export { TokenManager };
